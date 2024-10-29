@@ -62,7 +62,6 @@ func GetEmployeesHandler(w http.ResponseWriter, r *http.Request) {
             email
         FROM employee
     `)
-
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error querying database: %v", err), http.StatusInternalServerError)
 		return
@@ -72,6 +71,7 @@ func GetEmployeesHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var e Employee
 		if err := rows.Scan(&e.ID, &e.Name, &e.Email); err != nil {
+			rows.Close()
 			http.Error(w, fmt.Sprintf("Error scanning row: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -79,6 +79,7 @@ func GetEmployeesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = rows.Err(); err != nil {
+		rows.Close()
 		http.Error(w, fmt.Sprintf("error during row iteration: %v", err), http.StatusInternalServerError)
 		return
 	}
