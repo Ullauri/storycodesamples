@@ -55,13 +55,7 @@ func decorateEmployee(e *Employee) error {
 }
 
 func GetEmployeesHandler(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.Query(`
-        SELECT
-            id,
-            name,
-            email
-        FROM employee
-    `)
+	rows, err := db.Query(`SELECT id, name, email FROM employee`)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error querying database: %v", err), http.StatusInternalServerError)
 		return
@@ -71,29 +65,30 @@ func GetEmployeesHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var e Employee
 		if err := rows.Scan(&e.ID, &e.Name, &e.Email); err != nil {
-			rows.Close()
-			http.Error(w, fmt.Sprintf("Error scanning row: %v", err), http.StatusInternalServerError)
+			if closeErr := rows.Close(); closeErr != nil {
+				err = fmt.Errorf("%w; failed to close rows: %v", err, closeErr)
+			}
+			http.Error(w, fmt.Sprintf("error scanning row: %v", err), http.StatusInternalServerError)
 			return
 		}
+
 		employees = append(employees, e)
 	}
 
 	if err = rows.Err(); err != nil {
-		rows.Close()
+		if closeErr := rows.Close(); closeErr != nil {
+			err = fmt.Errorf("%w; failed to close rows: %v", err, closeErr)
+		}
 		http.Error(w, fmt.Sprintf("error during row iteration: %v", err), http.StatusInternalServerError)
 		return
 	}
-	rows.Close()
 
 	for i := range employees {
-		e := employees[i]
-
-		decorateEmployee(&e)
+		decorateEmployee(&employees[i])
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(employees); err != nil {
-		log.Printf("Error encoding response: %v", err) // Log the error instead of using fmt.Sprintf
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
 	}
